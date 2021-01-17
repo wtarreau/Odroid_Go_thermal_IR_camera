@@ -46,7 +46,7 @@ void setup()
   Serial.begin(115200); // MUST BE BEFORE GO.BEGIN()!!!!!
   GO.begin();
   delay(500);
-  //Serial.println("Booting...");
+  Serial.println("Booting...");
   serialBT.begin("GO IR Camera");
 
   // turn speaker off
@@ -190,13 +190,14 @@ void loop()
 uint16_t intensity_to_rgb(uint16_t col)
 {
   uint16_t r,g,b;
+
   switch(col)
   {
-    case   0 ...  41: r=0; g=85; b=map(col,0,41,20,140); break;
-    case  42 ... 127: r=map(col,41,128,0,255); g=0; b=map(col,41,128,140,80); break;
-    case 128 ... 169: r=255; g=map(col,128,170,0,60); b=map(col,128,170,80,0); break;
-    case 170 ... 212: r=255; g=map(col,170,212,60,235); b=0; break;
-    case 213 ... 255: r=255; g=map(col,212,255,235,255); b=map(col,212,255,0,255); break;
+    case   0 ...  63: r=0; g=map(col,0,63,160,0); b=map(col,0,63,160,120); break;
+    case  64 ... 111: r=map(col,64,112,0,255); g=0; b=map(col,64,112,120,80); break;
+    case 112 ... 159: r=255; g=map(col,112,160,0,60); b=map(col,112,160,80,0); break;
+    case 160 ... 212: r=255; g=map(col,160,213,60,235); b=0; break;
+    case 213 ... 255: r=255; g=map(col,213,255,235,255); b=map(col,213,255,0,255); break;
     default: r=g=b=0; // never happens
   }
   return GO.lcd.color565(r,g,b);
