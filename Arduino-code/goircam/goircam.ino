@@ -8,6 +8,8 @@
 #include "SPI.h"
 
 #define TA_SHIFT 8 //Default shift for MLX90640 in open air
+#define BSWAP16(x) ((((x) & 0xFF) << 8) | ((x) >> 8))
+
 const byte MLX90640_address = 0x33;
 static float mlx90640To[768];
 paramsMLX90640 mlx90640;
@@ -15,8 +17,8 @@ paramsMLX90640 mlx90640;
 BluetoothSerial serialBT;
 
 const char *rates[4]={ " .5Hz ", " 1 Hz ", " 2 Hz ", " 4 Hz " };
-// temp scales: auto, outdoor, indoor, body, water, full
-const char *scales[]={ " auto ", " 0-30 ", "15-35 ", "25-42 ", " 0-100", " full " };
+// temp scales: auto, outdoor winter, outdoor summer, indoor, body, water, full
+const char *scales[]={ " auto ", "-2>15 ", " 0>30 ", "15>35 ", "25>42 ", " 0>100", " full " };
 
 bool dooverlay=true,saved=false,havesd=false;
 int boxx=16,boxy=12;
@@ -186,11 +188,23 @@ uint16_t intensity_to_rgb(uint16_t col)
   return GO.lcd.color565(r,g,b);
 }
 
+static inline float getpix(int x, int y)
+{
+  if (y < 0)  y = 0;
+  if (y > 23) y = 23;
+
+  if (x < 0)  x = 0;
+  if (x > 31) x = 31;
+
+  return mlx90640To[y*32 + x];
+}
+
 void drawtodisplay(bool cls)
 {
   uint16_t c,x,y,ind,col,cnt;
   uint16_t xw=10,yw=10,xoff=0,yoff=0;
   float mid,val,surround;
+
   if(dooverlay==true)
   {
     xw=7;
@@ -198,6 +212,7 @@ void drawtodisplay(bool cls)
     xoff=0;
     yoff=0;
   }
+
   if(newscale)
   {
     mn=300;
@@ -208,6 +223,7 @@ void drawtodisplay(bool cls)
       if(mlx90640To[c]<mn) mn=mlx90640To[c];
     }
   }
+
   mid=mlx90640To[((23-boxy)*32)+boxx];
   if (mid<-40) mid=-40;
   if (mid>300) mid=300;
@@ -216,52 +232,43 @@ void drawtodisplay(bool cls)
 
   switch (scale)
   {
-    case 1: mn=0; mx=30; break;
-    case 2: mn=15; mx=35; break;
-    case 3: mn=25; mx=42; break;
-    case 4: mn=0; mx=100; break;
-    case 5: mn=-40; mx=300; break;
+    case 1: mn=-2; mx=15; break;
+    case 2: mn=0; mx=30; break;
+    case 3: mn=15; mx=35; break;
+    case 4: mn=25; mx=42; break;
+    case 5: mn=0; mx=100; break;
+    case 6: mn=-40; mx=300; break;
   }
 
   if(cls==true) GO.lcd.clearDisplay();
-  for(y=0;y<24;y++)
-  {
-    for(x=0;x<32;x++)
-    {
-      ind=(y*32)+x;
-      val=mlx90640To[ind];
-      // average over surrounding pixels: make the 4 closest ones count for up
-      // to 50% of the value.
-      surround=0; cnt=0;
-      if (y>0)
-      {
-        surround+=mlx90640To[ind-32];
-        cnt++;
-      }
-      if (y<23)
-      {
-        surround+=mlx90640To[ind+32];
-        cnt++;
-      }
-      if (x>0)
-      {
-        surround+=mlx90640To[ind-1];
-        cnt++;
-      }
-      if (x<31)
-      {
-        surround+=mlx90640To[ind+1];
-        cnt++;
-      }
-      if (cnt>0)  val=(val+surround/8.0)/(1.0+cnt/8.0);
-      if (val<mn) val=mn;
-      if (val>mx) val=mx;
+
+  for (y = 0; y < 24*yw; y++) {
+    uint16_t py  = y / yw;
+    uint16_t ry1 = y % yw;
+    uint16_t ry0 = yw - ry1;
+    float nbpx = 1.0 / (xw * yw);
+    uint16_t frame[320];
+
+    for (x = 0; x < 32*xw; x++) {
+      uint16_t px  = x / xw;
+      uint16_t rx1 = x % xw;
+      uint16_t rx0 = xw - rx1;
+
+      val =
+        getpix(px,     py) * rx0 * ry0 +
+        getpix(px+1,   py) * rx1 * ry0 +
+        getpix(px,   py+1) * rx0 * ry1 +
+        getpix(px+1, py+1) * rx1 * ry1;
+      val *= nbpx;
+
       // map temp to 0..255
       col=int(map(int(val*1000),int(mn*1000),int(mx*1000),0,255));
       col=intensity_to_rgb(col);
-      GO.lcd.fillRect(xoff+(x*xw),yoff+((24*yw)-(y*yw)),xw,yw,col);
+      frame[x] = BSWAP16(col);
     }
+    GO.lcd.pushRect(xoff, yoff+24*yw-y, xw*32, 1, frame);
   }
+
   if(dooverlay==true)
   {
     if(cls==false) GO.lcd.fillRect(xoff+(32*xw)+5,0,320-(xoff+(32*xw)),210,BLACK);
