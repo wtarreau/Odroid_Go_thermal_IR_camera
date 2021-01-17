@@ -28,11 +28,25 @@ int scale=0; // auto by default
 int newscale=1;
 float mn=-40,mx=300;
 
+
+void debi(const char *str, int i)
+{
+  Serial.print(str);
+  Serial.print(i);
+}
+
+void debf(const char *str, int f)
+{
+  Serial.print(str);
+  Serial.print(f);
+}
+
 void setup()
 {
   Serial.begin(115200); // MUST BE BEFORE GO.BEGIN()!!!!!
   GO.begin();
   delay(500);
+  //Serial.println("Booting...");
   serialBT.begin("GO IR Camera");
 
   // turn speaker off
@@ -188,21 +202,16 @@ uint16_t intensity_to_rgb(uint16_t col)
   return GO.lcd.color565(r,g,b);
 }
 
-static inline float getpix(int x, int y)
+static inline float getpix(uint16_t x, uint16_t y)
 {
-  if (y < 0)  y = 0;
-  if (y > 23) y = 23;
-
-  if (x < 0)  x = 0;
-  if (x > 31) x = 31;
-
   return mlx90640To[y*32 + x];
 }
 
 void drawtodisplay(bool cls)
 {
-  uint16_t c,x,y,ind,col,cnt;
+  uint16_t c,x,y,ix,iy,px,py,ind,col,cnt;
   uint16_t xw=10,yw=10,xoff=0,yoff=0;
+  float factor;
   float mid,val,surround;
 
   if(dooverlay==true)
@@ -212,6 +221,8 @@ void drawtodisplay(bool cls)
     xoff=0;
     yoff=0;
   }
+
+  factor = 1.0 / (xw * yw);
 
   if(newscale)
   {
@@ -242,31 +253,49 @@ void drawtodisplay(bool cls)
 
   if(cls==true) GO.lcd.clearDisplay();
 
-  for (y = 0; y < 24*yw; y++) {
-    uint16_t py  = y / yw;
-    uint16_t ry1 = y % yw;
-    uint16_t ry0 = yw - ry1;
-    float nbpx = 1.0 / (xw * yw);
+  /* Let's iterate over image lines (0..23). Each of these is repeated, but
+   * we precompute the positions and ratios which do no change within a line.
+   * For each of these lines we do the same for X. The summed value is always
+   * multiplied by (xw) and by (yw) since rx0+rx1=xw and ry0+ry1=yw so we
+   * have to correct it.
+   */
+  for (y = iy = 0; iy < 24; iy++) {
     uint16_t frame[320];
 
-    for (x = 0; x < 32*xw; x++) {
-      uint16_t px  = x / xw;
-      uint16_t rx1 = x % xw;
-      uint16_t rx0 = xw - rx1;
+    for (py = 0; py < yw; py++, y++) {
+      uint16_t y0, y1, ry0, ry1;
 
-      val =
-        getpix(px,     py) * rx0 * ry0 +
-        getpix(px+1,   py) * rx1 * ry0 +
-        getpix(px,   py+1) * rx0 * ry1 +
-        getpix(px+1, py+1) * rx1 * ry1;
-      val *= nbpx;
+      ry1 = py;
+      ry0 = yw - ry1;
 
-      // map temp to 0..255
-      col=int(map(int(val*1000),int(mn*1000),int(mx*1000),0,255));
-      col=intensity_to_rgb(col);
-      frame[x] = BSWAP16(col);
+      y0 = iy;
+      y1 = (iy < 23) ? iy+1 : 23;
+
+      for (x = ix = 0; ix < 32; ix++) {
+	for (px = 0; px < xw; px++, x++) {
+	  uint16_t x0, x1, rx0, rx1;
+
+	  rx1 = px;
+	  rx0 = xw - rx1;
+
+	  x0 = ix;
+	  x1 = (ix < 31) ? ix+1 : 31;
+
+	  val = (getpix(x0, y0) * (float)rx0 + getpix(x1, y0) * (float)rx1) * (float)ry0 +
+	        (getpix(x0, y1) * (float)rx0 + getpix(x1, y1) * (float)rx1) * (float)ry1;
+	  val *= factor;
+
+	  // map temp to 0..255
+	  col=int(map(int(val*1000),int(mn*1000),int(mx*1000),0,255));
+	  col=intensity_to_rgb(col);
+	  frame[x] = BSWAP16(col);
+	}
+      }
+      /* draw the line at once. Note that screen and sensor Y coordinates are
+       * opposed.
+       */
+      GO.lcd.pushRect(xoff, yoff+yw+24*yw-y-1, x, 1, frame);
     }
-    GO.lcd.pushRect(xoff, yoff+24*yw-y, xw*32, 1, frame);
   }
 
   if(dooverlay==true)
@@ -314,17 +343,22 @@ void getirframe()
   for (byte x = 0 ; x < 2 ; x++) //Read both subpages
   {
     uint16_t mlx90640Frame[834];
+    Serial.println("GetFrameData");
     int status = MLX90640_GetFrameData(MLX90640_address, mlx90640Frame);
     if (status < 0)
     {
       Serial.print("GetFrame Error: ");
       Serial.println(status);
     }
+    Serial.println("GetVdd");
     float vdd = MLX90640_GetVdd(mlx90640Frame, &mlx90640);
+    Serial.println("GetTa");
     float Ta = MLX90640_GetTa(mlx90640Frame, &mlx90640);
     float tr = Ta - TA_SHIFT; //Reflected temperature based on the sensor ambient temperature
     float emissivity = 0.95;
+    Serial.println("CalculateTo");
     MLX90640_CalculateTo(mlx90640Frame, &mlx90640, emissivity, tr, mlx90640To);
+    Serial.println("Done");
   }
   gottime=millis();
   boxx=16,boxy=12;
