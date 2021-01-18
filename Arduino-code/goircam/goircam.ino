@@ -187,19 +187,43 @@ void loop()
 }
 
 /* map an intensity from 0 to 255 to an RGB value using the NASA/IPAC colors using 6 equal steps */
-uint16_t intensity_to_rgb(uint16_t col)
+uint16_t intensity_to_rgb(int16_t col)
 {
-  uint16_t r,g,b;
+  int16_t r,g,b;
 
-  switch(col)
-  {
-    case   0 ...  63: r=0; g=map(col,0,63,160,0); b=map(col,0,63,160,120); break;
-    case  64 ... 111: r=map(col,64,112,0,255); g=0; b=map(col,64,112,120,80); break;
-    case 112 ... 159: r=255; g=map(col,112,160,0,60); b=map(col,112,160,80,0); break;
-    case 160 ... 212: r=255; g=map(col,160,213,60,235); b=0; break;
-    case 213 ... 255: r=255; g=map(col,213,255,235,255); b=map(col,213,255,0,255); break;
-    default: r=g=b=0; // never happens
-  }
+  /* R */
+  if (col < 32)
+    r = 0;
+  else if (col < 160)
+    r = (col - 32) * 2;
+  else
+    r = 255;
+
+  /* G */
+  if (col < 96)
+    g = 192 - col*2;
+  else if (col < 139)
+    g = 0;
+  else if (col < 224)
+    g = (col - 139) * 3;
+  else
+    g = 255;
+
+  /* B */
+  if (col < 32)
+    b = 255;
+  else if (col < 160)
+    b = 255 - (col - 32) * 2;
+  else if (col < 224)
+    b = 0;
+  else
+    b = (col - 224) * 8;
+
+  /* normally doesn't happen */
+  if (r < 0) r = 0; else if (r > 255) r = 255;
+  if (g < 0) g = 0; else if (g > 255) g = 255;
+  if (b < 0) b = 0; else if (b > 255) b = 255;
+
   return GO.lcd.color565(r,g,b);
 }
 
