@@ -46,7 +46,7 @@ void setup()
   Serial.begin(115200); // MUST BE BEFORE GO.BEGIN()!!!!!
   GO.begin();
   delay(500);
-  Serial.println("Booting...");
+  //Serial.println("Booting...");
   serialBT.begin("GO IR Camera");
 
   // turn speaker off
@@ -69,6 +69,10 @@ void setup()
   if (status != 0)
     Serial.println("Parameter extraction failed");
   MLX90640_SetRefreshRate(MLX90640_address,refresh);
+
+  /* change the frequency after EEPROM was read */
+  Wire.setClock(800000);
+
   if(SD.begin()) havesd=true;
   else Serial.println("Card Mount Failed");
   GO.lcd.setTextFont(4);
@@ -76,7 +80,7 @@ void setup()
   GO.lcd.setTextDatum(MC_DATUM);
 //  GO.lcd.setCursor(160,120);
   GO.lcd.drawString("IR Camera v1.1",160,120);
-  delay(500);
+  delay(100);
   getirframe();
   drawtodisplay(true, 0, 23);
   Serial.println("Setup done");
