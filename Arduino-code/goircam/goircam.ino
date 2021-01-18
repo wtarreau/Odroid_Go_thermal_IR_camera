@@ -69,6 +69,7 @@ void setup()
   if (status != 0)
     Serial.println("Parameter extraction failed");
   MLX90640_SetRefreshRate(MLX90640_address,refresh);
+  MLX90640_SetResolution(MLX90640_address, 0);
 
   /* change the frequency after EEPROM was read */
   Wire.setClock(800000);
