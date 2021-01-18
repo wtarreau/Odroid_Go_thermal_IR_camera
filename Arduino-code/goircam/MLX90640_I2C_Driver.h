@@ -31,7 +31,7 @@
 //Teensy 3.2
 #define I2C_BUFFER_LENGTH 32
 
-#else
+#elif !defined(I2C_BUFFER_LENGTH)
 
 //The catch-all default is 32
 #define I2C_BUFFER_LENGTH 32
