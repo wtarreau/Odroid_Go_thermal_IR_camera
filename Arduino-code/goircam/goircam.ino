@@ -386,24 +386,48 @@ void drawtodisplay(bool cls, uint16_t from, uint16_t to)
 
 void getirframe()
 {
+  /* We cannot choose to receive two distinct frames, they're often random,
+   * so we're reading one subpage into one frame, then we perform a few
+   * retries to try to get the second one.
+   */
+  uint16_t mlx90640Frame[2][834];
+  int status;
+  int frm;
+
+  status = MLX90640_GetFrameData(MLX90640_address, mlx90640Frame[0]);
+  if (status < 0) {
+    Serial.print("GetFrameData0 Error: ");
+    Serial.println(status);
+    return;
+  }
+  Serial.print("subpage0:"); Serial.println(MLX90640_GetSubPageNumber(mlx90640Frame[0]));
+
+
+  for (frm = 0; frm < 3; frm++) {
+    status = MLX90640_GetFrameData(MLX90640_address, mlx90640Frame[1]);
+    if (status < 0) {
+      Serial.print("GetFrameData1 Error: ");
+      Serial.println(status);
+      return;
+    }
+    Serial.print("subpage1:"); Serial.println(MLX90640_GetSubPageNumber(mlx90640Frame[1]));
+    /* try to get the second subpage */
+    if (MLX90640_GetSubPageNumber(mlx90640Frame[0]) !=
+	MLX90640_GetSubPageNumber(mlx90640Frame[1]))
+      break;
+  }
+
   for (byte x = 0 ; x < 2 ; x++) //Read both subpages
   {
-    uint16_t mlx90640Frame[834];
-    Serial.println("GetFrameData");
-    int status = MLX90640_GetFrameData(MLX90640_address, mlx90640Frame);
-    if (status < 0)
-    {
-      Serial.print("GetFrame Error: ");
-      Serial.println(status);
-    }
-    Serial.println("GetVdd");
-    float vdd = MLX90640_GetVdd(mlx90640Frame, &mlx90640);
-    Serial.println("GetTa");
-    float Ta = MLX90640_GetTa(mlx90640Frame, &mlx90640);
+    float vdd = MLX90640_GetVdd(mlx90640Frame[x], &mlx90640);
+    float Ta = MLX90640_GetTa(mlx90640Frame[x], &mlx90640);
     float tr = Ta - TA_SHIFT; //Reflected temperature based on the sensor ambient temperature
     float emissivity = 0.95;
+
+    Serial.print("vdd:"); Serial.println(vdd);
+    Serial.print("ambient:"); Serial.println(Tr);
     Serial.println("CalculateTo");
-    MLX90640_CalculateTo(mlx90640Frame, &mlx90640, emissivity, tr, mlx90640To);
+    MLX90640_CalculateTo(mlx90640Frame[x], &mlx90640, emissivity, tr, mlx90640To);
     Serial.println("Done");
   }
   gottime=millis();
