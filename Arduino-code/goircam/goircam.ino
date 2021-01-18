@@ -78,7 +78,7 @@ void setup()
   GO.lcd.drawString("IR Camera v1.1",160,120);
   delay(500);
   getirframe();
-  drawtodisplay(true);
+  drawtodisplay(true, 0, 23);
   Serial.println("Setup done");
 }
 
@@ -94,7 +94,7 @@ void loop()
                 sendtoserialtext();
                 break;
       case 'i': getirframe();
-                drawtodisplay(true);
+                drawtodisplay(true, 0, 23);
                 break;
       case 't': sendtoserialtext();
                 break;
@@ -104,7 +104,7 @@ void loop()
   if(GO.BtnA.isPressed()==1)
   {
     getirframe();
-    drawtodisplay(true);
+    drawtodisplay(true, 0, 23);
     newscale=0;
   }
   else
@@ -119,12 +119,12 @@ void loop()
     if(dooverlay==true) dooverlay=false;
     else dooverlay=true;
     GO.lcd.clearDisplay();
-    drawtodisplay(true);
+    drawtodisplay(true, 0, 23);
   }
   if(GO.BtnVolume.isPressed()==1)
   {
     scale=(scale+1)%(sizeof(scales)/sizeof(scales[0]));
-    drawtodisplay(true);
+    drawtodisplay(true, 0, 23);
   }
   if(GO.BtnSelect.isPressed()==1)
   {
@@ -132,7 +132,7 @@ void loop()
     MLX90640_SetRefreshRate(MLX90640_address,refresh);
     delay(100 + (500 << refresh));
     getirframe();
-    drawtodisplay(true);
+    drawtodisplay(true, 0, 23);
   }
   if(GO.BtnStart.isPressed()==1)
   {
@@ -140,7 +140,7 @@ void loop()
     {
       savetosdcard();
       saved=true;
-      drawtodisplay(true);
+      drawtodisplay(true, 0, 23);
     }
   }
   delay(50);
@@ -150,7 +150,7 @@ void loop()
     {
       while(GO.JOY_Y.isAxisPressed()!=0){GO.update();delay(50);}
       boxy++;
-      drawtodisplay(false);
+      drawtodisplay(false, 24-boxy, 24-boxy);
       delay(50);
     }
   }
@@ -160,7 +160,7 @@ void loop()
     {
       while(GO.JOY_Y.isAxisPressed()!=0){GO.update();delay(50);}
       boxy--;
-      drawtodisplay(false);
+      drawtodisplay(false, 22-boxy, 22-boxy);
       delay(50);
     }
   }
@@ -170,7 +170,7 @@ void loop()
     {
       while(GO.JOY_X.isAxisPressed()!=0){GO.update();delay(50);}
       boxx++;
-      drawtodisplay(false);
+      drawtodisplay(false, 23-boxy, 23-boxy);
       delay(50);
     }
   }
@@ -180,7 +180,7 @@ void loop()
     {
       while(GO.JOY_X.isAxisPressed()!=0){GO.update();delay(50);}
       boxx--;
-      drawtodisplay(false);
+      drawtodisplay(false, 23-boxy, 23-boxy);
       delay(50);
     }
   }
@@ -232,7 +232,10 @@ static inline float getpix(uint16_t x, uint16_t y)
   return mlx90640To[y*32 + x];
 }
 
-void drawtodisplay(bool cls)
+/* redraws display, optionally from sensor line <from> to line <to> if <cls> is
+ * false.
+ */
+void drawtodisplay(bool cls, uint16_t from, uint16_t to)
 {
   uint16_t c,x,y,ix,iy,px,py,ind,col,cnt;
   uint16_t xw=10,yw=10,xoff=0,yoff=0;
@@ -276,7 +279,17 @@ void drawtodisplay(bool cls)
     case 6: mn=-40; mx=300; break;
   }
 
-  if(cls==true) GO.lcd.clearDisplay();
+  if (cls) {
+    GO.lcd.clearDisplay();
+    from = 0;
+    to = 23;
+  }
+  else {
+    if (from > 23)
+      from = 23;
+    if (to > 23)
+      to = 23;
+  }
 
   /* Let's iterate over image lines (0..23). Each of these is repeated, but
    * we precompute the positions and ratios which do no change within a line.
@@ -284,7 +297,8 @@ void drawtodisplay(bool cls)
    * multiplied by (xw) and by (yw) since rx0+rx1=xw and ry0+ry1=yw so we
    * have to correct it.
    */
-  for (y = iy = 0; iy < 24; iy++) {
+  y = from * yw;
+  for (iy = from; iy <= to; iy++) {
     uint16_t frame[320];
 
     for (py = 0; py < yw; py++, y++) {
@@ -323,9 +337,12 @@ void drawtodisplay(bool cls)
     }
   }
 
-  if(dooverlay==true)
-  {
-    if(cls==false) GO.lcd.fillRect(xoff+(32*xw)+5,0,320-(xoff+(32*xw)),210,BLACK);
+  if (dooverlay) {
+    GO.lcd.drawRect(xoff+(boxx*xw),yoff+((boxy+1)*yw),xw,yw,GREEN);
+
+    //if(cls==false)
+    //  GO.lcd.fillRect(xoff+(32*xw)+5,0,320-(xoff+(32*xw)),210,BLACK);
+
     GO.lcd.setTextFont(2);
     GO.lcd.setTextSize(1);
     GO.lcd.setTextDatum(ML_DATUM);
@@ -336,29 +353,28 @@ void drawtodisplay(bool cls)
     GO.lcd.setTextColor(GREEN,BLACK);
     GO.lcd.drawFloat(mid,3,255,yoff+((24*yw)/2)+yw);
 
-    for (y=yoff+7; y<yoff+24*yw+7; y++)
-    {
-      col=map(y,yoff+7,yoff+24*yw+7,255,0);
-      col=intensity_to_rgb(col);
-      GO.lcd.drawLine(235,y,245,y,col);
-    }
-    GO.lcd.drawRect(234,yoff+7,12,24*yw,WHITE);
+    if (cls) {
+      for (y=yoff+7; y<yoff+24*yw+7; y++) {
+	col=map(y,yoff+7,yoff+24*yw+7,255,0);
+	col=intensity_to_rgb(col);
+	GO.lcd.drawLine(235,y,245,y,col);
+      }
+      GO.lcd.drawRect(234,yoff+7,12,24*yw,WHITE);
 
-    GO.lcd.drawRect(xoff+(boxx*xw),yoff+((boxy+1)*yw),xw,yw,GREEN);
-    // Draw button labels
-    GO.lcd.setTextFont(2);
-    GO.lcd.setTextSize(1);
-    GO.lcd.setTextColor(BLACK,WHITE);
-    GO.lcd.setTextDatum(ML_DATUM);
-    GO.lcd.drawString(" ZOOM ",0,230);
-    GO.lcd.setTextDatum(MC_DATUM);
-    GO.lcd.drawString(scales[scale],100,230);
-    GO.lcd.setTextDatum(MC_DATUM);
-    GO.lcd.drawString(rates[refresh],220,230);
-    if(saved==false && havesd==true)
-    {
-      GO.lcd.setTextDatum(MR_DATUM);
-      GO.lcd.drawString(" SAVE  ",320,230);
+      // Draw button labels
+      GO.lcd.setTextFont(2);
+      GO.lcd.setTextSize(1);
+      GO.lcd.setTextColor(BLACK,WHITE);
+      GO.lcd.setTextDatum(ML_DATUM);
+      GO.lcd.drawString(" ZOOM ",0,230);
+      GO.lcd.setTextDatum(MC_DATUM);
+      GO.lcd.drawString(scales[scale],100,230);
+      GO.lcd.setTextDatum(MC_DATUM);
+      GO.lcd.drawString(rates[refresh],220,230);
+      if (!saved && havesd) {
+	GO.lcd.setTextDatum(MR_DATUM);
+	GO.lcd.drawString(" SAVE  ",320,230);
+      }
     }
   }
 }
