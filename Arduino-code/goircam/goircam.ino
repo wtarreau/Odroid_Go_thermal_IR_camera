@@ -137,7 +137,8 @@ void loop()
   {
     refresh=(refresh+1)&3;
     MLX90640_SetRefreshRate(MLX90640_address,refresh);
-    delay(100 + (500 << refresh));
+    // refresh period - 20% as per datasheet
+    delay(800 >> refresh);
     getirframe();
     drawtodisplay(true, 0, 23);
   }
@@ -397,32 +398,36 @@ void getirframe()
    */
   uint16_t mlx90640Frame[2][834];
   int status;
-  int frm;
+  int frm, pages;
 
-  Serial.println("GetFrameData0...");
-  status = MLX90640_GetFrameData(MLX90640_address, mlx90640Frame[0]);
-  if (status < 0) {
-    debi("Status = ", status, "(error)");
-    return;
-  }
+  Serial.println("TriggerMeasurement...");
+  //MLX90640_TriggerMeasurement(MLX90640_address);
+  //Serial.println("SynchFrame...");
+  //MLX90640_SynchFrame(MLX90640_address);
+  //Serial.println("GetFrameData0...");
 
-  debi("Status = ", status, "(ok)");
-  debi("subpage0:", MLX90640_GetSubPageNumber(mlx90640Frame[0]), "");
-
-  for (frm = 0; frm < 3; frm++) {
-    debi("GetFrameData1... (try ", frm, ")");
-    status = MLX90640_GetFrameData(MLX90640_address, mlx90640Frame[1]);
-    if (status < 0) {
-      debi("Status = ", status, "(error)");
+  // we don't choose what page the sensor sends us first. The sensor really
+  // takes two different pictures, and if they're too far apart, some checker
+  // pattern appears. The sensor continues to sample while we read so we can
+  // often retrieve the same subpage twice. Thus we're trying to get two
+  // consecutive pages and stop once we have one of each.
+  pages = 0; // binary 00, 01, 10, 11
+  for (frm = 0; pages < 3 && frm < 8; frm++) {
+    // status is the page number (0/1) or <0 for errors.
+    debi("Retrieving subpage ", pages & 1, "...");
+    status = MLX90640_GetFrameData(MLX90640_address, mlx90640Frame[pages & 1]);
+    debi("Status = ", status, (status >= 0) ? "(ok)" : "(error)");
+    if (status < 0)
       return;
-    }
-    debi("Status = ", status, "(ok)");
-    debi("subpage1:", MLX90640_GetSubPageNumber(mlx90640Frame[1]), "");
 
-    /* try to get the second subpage */
-    if (MLX90640_GetSubPageNumber(mlx90640Frame[0]) != MLX90640_GetSubPageNumber(mlx90640Frame[1]))
-      break;
-    Serial.println("-> was same page, trying again");
+    status = !!status;
+    debi("Got page ", status, "");
+
+    // not the expected page, resync and try again.
+    if ((pages & 1) != status)
+      memcpy(mlx90640Frame[status], mlx90640Frame[pages & 1], sizeof(*mlx90640Frame));
+
+    pages |= 1 << status;
   }
 
   for (byte x = 0 ; x < 2 ; x++) //Read both subpages
