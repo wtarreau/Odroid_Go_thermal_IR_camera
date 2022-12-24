@@ -29,16 +29,18 @@ int newscale=1;
 float mn=-40,mx=300;
 
 
-void debi(const char *str, int i)
+void debi(const char *pfx, int i, const char *sfx)
 {
-  Serial.print(str);
+  Serial.print(pfx);
   Serial.print(i);
+  Serial.println(sfx);
 }
 
-void debf(const char *str, int f)
+void debf(const char *pfx, float f, const char *sfx)
 {
-  Serial.print(str);
+  Serial.print(pfx);
   Serial.print(f);
+  Serial.println(sfx);
 }
 
 void setup()
@@ -46,7 +48,7 @@ void setup()
   Serial.begin(115200); // MUST BE BEFORE GO.BEGIN()!!!!!
   GO.begin();
   delay(500);
-  //Serial.println("Booting...");
+  Serial.println("Booting...");
   serialBT.begin("GO IR Camera");
 
   // turn speaker off
@@ -247,6 +249,8 @@ void drawtodisplay(bool cls, uint16_t from, uint16_t to)
   float factor;
   float mid,val,surround;
 
+  Serial.println("enter draw");
+
   if(dooverlay==true)
   {
     xw=7;
@@ -382,6 +386,7 @@ void drawtodisplay(bool cls, uint16_t from, uint16_t to)
       }
     }
   }
+  Serial.println("leave draw");
 }
 
 void getirframe()
@@ -394,27 +399,30 @@ void getirframe()
   int status;
   int frm;
 
+  Serial.println("GetFrameData0...");
   status = MLX90640_GetFrameData(MLX90640_address, mlx90640Frame[0]);
   if (status < 0) {
-    Serial.print("GetFrameData0 Error: ");
-    Serial.println(status);
+    debi("Status = ", status, "(error)");
     return;
   }
-  Serial.print("subpage0:"); Serial.println(MLX90640_GetSubPageNumber(mlx90640Frame[0]));
 
+  debi("Status = ", status, "(ok)");
+  debi("subpage0:", MLX90640_GetSubPageNumber(mlx90640Frame[0]), "");
 
   for (frm = 0; frm < 3; frm++) {
+    debi("GetFrameData1... (try ", frm, ")");
     status = MLX90640_GetFrameData(MLX90640_address, mlx90640Frame[1]);
     if (status < 0) {
-      Serial.print("GetFrameData1 Error: ");
-      Serial.println(status);
+      debi("Status = ", status, "(error)");
       return;
     }
-    Serial.print("subpage1:"); Serial.println(MLX90640_GetSubPageNumber(mlx90640Frame[1]));
+    debi("Status = ", status, "(ok)");
+    debi("subpage1:", MLX90640_GetSubPageNumber(mlx90640Frame[1]), "");
+
     /* try to get the second subpage */
-    if (MLX90640_GetSubPageNumber(mlx90640Frame[0]) !=
-	MLX90640_GetSubPageNumber(mlx90640Frame[1]))
+    if (MLX90640_GetSubPageNumber(mlx90640Frame[0]) != MLX90640_GetSubPageNumber(mlx90640Frame[1]))
       break;
+    Serial.println("-> was same page, trying again");
   }
 
   for (byte x = 0 ; x < 2 ; x++) //Read both subpages
@@ -424,9 +432,9 @@ void getirframe()
     float tr = Ta - TA_SHIFT; //Reflected temperature based on the sensor ambient temperature
     float emissivity = 0.95;
 
-    Serial.print("vdd:"); Serial.println(vdd);
-    Serial.print("ambient:"); Serial.println(Tr);
-    Serial.println("CalculateTo");
+    debf(x ? "vdd1 = " : "vdd0 = ", vdd, "");
+    debf(x ? "ambient1 = " : "ambient0 = ", tr, "");
+    debi("CalculateTo", x, "...");
     MLX90640_CalculateTo(mlx90640Frame[x], &mlx90640, emissivity, tr, mlx90640To);
     Serial.println("Done");
   }
@@ -490,4 +498,3 @@ void savetosdcard()
   file.println();
   file.close();
 }
-
