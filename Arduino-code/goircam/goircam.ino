@@ -49,7 +49,7 @@ void setup()
   GO.begin();
   delay(500);
   Serial.println("Booting...");
-  serialBT.begin("GO IR Camera");
+  //serialBT.begin("GO IR Camera");
 
   // turn speaker off
   GO.Speaker.setVolume(0);
@@ -249,6 +249,7 @@ void drawtodisplay(bool cls, uint16_t from, uint16_t to)
   uint16_t xw=10,yw=10,xoff=0,yoff=0;
   float factor;
   float mid,val,surround;
+  float range_scale;
 
   Serial.println("enter draw");
 
@@ -292,6 +293,8 @@ void drawtodisplay(bool cls, uint16_t from, uint16_t to)
     case 6: mn=-40; mx=300; break;
   }
 
+  range_scale = 255.0 / (mx - mn);
+
   if (cls) {
     GO.lcd.clearDisplay();
     from = 0;
@@ -315,30 +318,39 @@ void drawtodisplay(bool cls, uint16_t from, uint16_t to)
     uint16_t frame[320];
 
     for (py = 0; py < yw; py++, y++) {
-      uint16_t y0, y1, ry0, ry1;
+      uint16_t y0, y1;
+      float ry0, ry1;
 
-      ry1 = py;
-      ry0 = yw - ry1;
+      ry1 = (float)py * factor;
+      ry0 = (float)(yw - py) * factor;
 
       y0 = iy;
       y1 = (iy < 23) ? iy+1 : 23;
 
       for (x = ix = 0; ix < 32; ix++) {
+	uint16_t x0, x1;
+	uint32_t p00, p01, p10, p11;
+
+	x0 = ix;
+	x1 = (ix < 31) ? ix+1 : 31;
+
+	p00 = getpix(x0, y0);
+	p10 = getpix(x1, y0);
+	p01 = getpix(x0, y1);
+	p11 = getpix(x1, y1);
+
 	for (px = 0; px < xw; px++, x++) {
-	  uint16_t x0, x1, rx0, rx1;
+	  float rx0, rx1;
 
-	  rx1 = px;
-	  rx0 = xw - rx1;
+	  rx1 = (float)px;
+	  rx0 = (float)(xw - px);
 
-	  x0 = ix;
-	  x1 = (ix < 31) ? ix+1 : 31;
-
-	  val = (getpix(x0, y0) * (float)rx0 + getpix(x1, y0) * (float)rx1) * (float)ry0 +
-	        (getpix(x0, y1) * (float)rx0 + getpix(x1, y1) * (float)rx1) * (float)ry1;
-	  val *= factor;
-
-	  // map temp to 0..255
-	  col=int(map(int(val*1000),int(mn*1000),int(mx*1000),0,255));
+	  val = (p00 * rx0 + p10 * rx1) * ry0 + (p01 * rx0 + p11 * rx1) * ry1;
+	  if (val < mn)
+		val = mn;
+	  else if (val > mx)
+		val = mx;
+	  col = int((val - mn) * range_scale); // bounded to 255
 	  col=intensity_to_rgb(col);
 	  frame[x] = BSWAP16(col);
 	}
