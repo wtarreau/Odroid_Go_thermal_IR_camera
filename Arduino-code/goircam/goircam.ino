@@ -49,7 +49,7 @@ void setup()
   GO.begin();
   delay(500);
   Serial.println("Booting...");
-  serialBT.begin("GO IR Camera");
+  //serialBT.begin("GO IR Camera");
 
   // turn speaker off
   GO.Speaker.setVolume(0);
@@ -262,15 +262,18 @@ void drawtodisplay(bool cls, uint16_t from, uint16_t to)
 
   factor = 1.0 / (xw * yw);
 
+  // do not reset the scale when the button is held, but still
+  // extend it if needed to avoid saturation.
   if(newscale)
   {
     mn=300;
     mx=-40;
-    for(c=0;c<768;c++)
-    {
-      if(mlx90640To[c]>mx) mx=mlx90640To[c];
-      if(mlx90640To[c]<mn) mn=mlx90640To[c];
-    }
+  }
+
+  for(c=0;c<768;c++)
+  {
+    if(mlx90640To[c]>mx) mx=mlx90640To[c];
+    if(mlx90640To[c]<mn) mn=mlx90640To[c];
   }
 
   mid=mlx90640To[((23-boxy)*32)+boxx];
