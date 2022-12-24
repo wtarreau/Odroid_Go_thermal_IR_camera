@@ -295,7 +295,7 @@ void drawtodisplay(bool cls, uint16_t from, uint16_t to)
 
   range_scale = 255.0 / (mx - mn);
 
-  if (cls) {
+  if (cls && newscale) {
     GO.lcd.clearDisplay();
     from = 0;
     to = 23;
@@ -378,7 +378,7 @@ void drawtodisplay(bool cls, uint16_t from, uint16_t to)
     GO.lcd.setTextColor(GREEN,BLACK);
     GO.lcd.drawFloat(mid,3,255,yoff+((24*yw)/2)+yw);
 
-    if (cls) {
+    if (cls && newscale) {
       for (y=yoff+7; y<yoff+24*yw+7; y++) {
 	col=map(y,yoff+7,yoff+24*yw+7,255,0);
 	col=intensity_to_rgb(col);
