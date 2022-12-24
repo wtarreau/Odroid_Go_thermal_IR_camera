@@ -16,7 +16,7 @@ paramsMLX90640 mlx90640;
 
 BluetoothSerial serialBT;
 
-const char *rates[4]={ " .5Hz ", " 1 Hz ", " 2 Hz ", " 4 Hz " };
+const char *rates[5]={ " .5Hz ", " 1 Hz ", " 2 Hz ", " 4 Hz ", "8 Hz" };
 // temp scales: auto, outdoor winter, outdoor summer, indoor, body, water, full
 const char *scales[]={ " auto ", "-2>15 ", " 0>30 ", "15>35 ", "25>42 ", " 0>100", " full " };
 
@@ -49,7 +49,7 @@ void setup()
   GO.begin();
   delay(500);
   Serial.println("Booting...");
-  //serialBT.begin("GO IR Camera");
+  serialBT.begin("GO IR Camera");
 
   // turn speaker off
   GO.Speaker.setVolume(0);
@@ -135,7 +135,7 @@ void loop()
   }
   if(GO.BtnSelect.isPressed()==1)
   {
-    refresh=(refresh+1)&3;
+    refresh=(refresh+1)%5;
     MLX90640_SetRefreshRate(MLX90640_address,refresh);
     // refresh period - 20% as per datasheet
     delay(800 >> refresh);
