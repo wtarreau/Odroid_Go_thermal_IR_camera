@@ -329,7 +329,7 @@ void drawtodisplay(bool cls, uint16_t from, uint16_t to)
 
       for (x = ix = 0; ix < 32; ix++) {
 	uint16_t x0, x1;
-	uint32_t p00, p01, p10, p11;
+	float p00, p01, p10, p11;
 
 	x0 = ix;
 	x1 = (ix < 31) ? ix+1 : 31;
